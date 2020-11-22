@@ -21,6 +21,8 @@ using Newtonsoft.Json;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Web.UI.WebControls;
+using System.IO;
+using System.Text.RegularExpressions;
 
 namespace HEV_Agent_V2
 {
@@ -88,8 +90,8 @@ namespace HEV_Agent_V2
 
             //Khởi tạo hàng 1 ngay
             var hang = TbMachine.NewRow();
-            hang["LastTime"] = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
-            hang["Name"] = "OCTA";
+            hang["LastTime"] = DateTime.Now.ToString("yyyy'/'MM'/'dd HH:mm:ss");
+            hang["Name"] = "CAL";
             hang["Status"] = 1;
             hang["ErrorCode"] = "1st";
             hang["Note"] = Note;
@@ -135,73 +137,58 @@ namespace HEV_Agent_V2
 
 
         //PhanTich
-        private void PhanTich(string FileName)
+        private void PhanTichErrorLog(string filep, string fname)
         {
 
             try
             {
                 //Tách ra các thông tin cần thiết trước
-                string[] ThongTin = FileName.Split(',');
-                string Ten = ThongTin[5].Trim();
-                string Code = ThongTin[2].Trim();
-                string d = DateTime.Now.ToString();
-                int stt = 0;
-                bool co = false;
-                
-                if (Code == "9000")
-                    stt = 1;
+                //Tách ra các thông tin cần thiết trước
 
+                string app_path = System.IO.Directory.GetCurrentDirectory();
+                string kq = "";
+                int stt = 1;
+                string Code = "";
 
+                File.Copy(@filep, @app_path + @"/Temp/" + @fname, true);
+                System.IO.StreamReader file = new System.IO.StreamReader(@app_path + "/Temp/" + @fname);
 
-                foreach (DataRow row in TbMachine.Rows)
+                while (file.EndOfStream != true)
                 {
-                    //Nếu có rồi thì update vào hàng đó
-                    if (row["Name"].ToString()==Ten)
-                    {
-                        row["LastTime"] = d;
-                        row["ErrorCode"] = Code;
-                        row["Status"] = stt;
-                        Console.WriteLine("Đã có trong csdl, update thôi");
-                        co = true;
-      
-                    }
-
+                    kq = file.ReadLine().Trim().ToUpper();
                 }
+                file.Close();
+                //Xoá file 
 
-                //Nếu chưa có hàng đó thì tạo hàng
-                if (!co)
-                {
-                    var hang = TbMachine.NewRow();
-                    hang["LastTime"] = d;
-                    hang["Name"] = Ten;
-                    hang["Status"] = stt;
-                    hang["ErrorCode"] = Code;
-                    hang["Note"] = Note;
-                    hang["Ip"] = Ip;
+                File.Delete(@app_path + "/Temp/" + @fname);
+               
+                //Tách ra được thông tin lỗi
+                if (kq!="")
+                    stt = 0;
 
-                    TbMachine.Rows.Add(hang);
-                }
+                //Tách lấy error code
+                string[] t1 = kq.Split(']');
+                string _code = t1[2].Trim().Replace(".", "");
+                Code = _code.Replace(" ", "_");
+
+                TbMachine.Rows[0]["LastTime"] = DateTime.Now.ToString("yyyy'/'MM'/'dd HH:mm:ss");
+                TbMachine.Rows[0]["Status"] = stt;
+                TbMachine.Rows[0]["ErrorCode"] = Code;
+                Debug.WriteLine("cODEEE ==> " + Code);
 
                 //Dù sao đi chăng nữa thì cũng Pub lên server thôi mà Man
                 //Build Json rồi Pub lên kênh
                 if (client.IsConnected)
                 {
-                    //client.Publish("hev",);
-
-                    //[{"LastTime":"17-Nov-20 5:32:10 PM","Name":"COM101","Status":0,"ErrorCode":"SV6H3110"}]
-
-                    string abc= "[{\"LastTime\":\""+d+"\",\"Name\":\""+Ten+"\",\"Status\":"+stt+",\"ErrorCode\":\""+Code+ "\",\"Note\":\"" + Note + "\",\"Ip\":\"" + Ip + "\"}]";
-                    //string data = TbToJson(TbMachine);
+                    string abc = "[{\"LastTime\":\"" + TbMachine.Rows[0]["LastTime"] + "\",\"Name\":\""+ TbMachine.Rows[0]["Name"]+"\",\"Status\":" + stt + ",\"ErrorCode\":\"" + Code + "\",\"Note\":\"" + Note + "\",\"Ip\":\"" + Ip + "\"}]";
                     client.Publish("hev", Encoding.UTF8.GetBytes(abc), MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE, false);
-                    Debug.WriteLine("Vừa pub dữ liệu lẻ lên server đó a");
+
 
                 }
                 else
                 {
-                    //Debug.WriteLine("K kết nối tới server");
                     log.Error("C160. Khong Publish du lieu len Server duoc");
                 }    
-
 
             }
 
@@ -214,10 +201,97 @@ namespace HEV_Agent_V2
                 this.radGridView1.CurrentRow = null;
             }
 
+        }
 
 
+        //PhanTich
+        private void PhanTichOK(string filep, string fname)
+        {
+
+            try
+            {
+                //Tách ra các thông tin cần thiết trước
+                //Tách ra các thông tin cần thiết trước
+
+                string app_path = System.IO.Directory.GetCurrentDirectory();
+                string kq = "";
+                int stt = 0;
+                
+
+                File.Copy(@filep, @app_path + @"/Temp/" + @fname, true);
+                System.IO.StreamReader file = new System.IO.StreamReader(@app_path + "/Temp/" + @fname);
+                
+                
+                string ketqua2 = "";
+                string thoigian = DateTime.Now.ToString("HH:mm");
+
+                while (file.EndOfStream != true)
+                {
+                    kq = file.ReadLine();
+                    kq = kq.Replace(" ", "");
+                    if (kq.Contains("CHANGEOPSTATUS:STOP->RUN"))
+                        ketqua2 = kq;
+                }
+                file.Close();
+                File.Delete(@app_path + "/Temp/" + @fname);
+
+                //So sánh về mặt thời gian
+                //Nếu thời gian trùng khớp nhau, thì mới có ý nghĩa
+                //tách ketqua 2 ra -> lấy giờ
+                
+
+                string k0 = ketqua2.Substring(0,5);
+                
+                Debug.WriteLine("K0 ==> " + k0);
+                Debug.WriteLine("thoi gian ==> " + thoigian);
+
+
+                if (k0 == thoigian)
+                  { 
+                    stt = 1; 
+                    string Code = "OK_GOOD";
+
+
+                    TbMachine.Rows[0]["LastTime"] = DateTime.Now.ToString("yyyy'/'MM'/'dd HH:mm:ss");
+                    TbMachine.Rows[0]["Status"] = stt;
+                    TbMachine.Rows[0]["ErrorCode"] = Code;
+                    
+
+                    //Dù sao đi chăng nữa thì cũng Pub lên server thôi mà Man
+                    //Build Json rồi Pub lên kênh
+                    if (client.IsConnected)
+                    {
+                        string abc = "[{\"LastTime\":\"" + TbMachine.Rows[0]["LastTime"] + "\",\"Name\":\"" + TbMachine.Rows[0]["Name"] + "\",\"Status\":" + stt + ",\"ErrorCode\":\"" + Code + "\",\"Note\":\"" + Note + "\",\"Ip\":\"" + Ip + "\"}]";
+                        client.Publish("hev", Encoding.UTF8.GetBytes(abc), MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE, false);
+
+
+                    }
+                    else
+                    {
+                        log.Error("C160. Khong Publish du lieu len Server duoc");
+                    }
+                }
+
+            }
+
+            catch (Exception ex)
+            {
+                log.Error(ex);
+            }
+            finally
+            {
+                this.radGridView1.CurrentRow = null;
+            }
 
         }
+
+
+
+
+
+
+
+
 
         public static string GetLocalIPAddress()
         {
@@ -241,8 +315,9 @@ namespace HEV_Agent_V2
 
         private void fileSystemWatcher1_Created(object sender, System.IO.FileSystemEventArgs e)
         {
-            Debug.WriteLine(e.Name);
-            PhanTich(e.Name);
+          //  Debug.WriteLine(e.Name);
+            //PhanTich(e.Name);
+            //ĐỂ ĐÂY ĐÃ
         }
         
        
@@ -303,7 +378,8 @@ namespace HEV_Agent_V2
 
         }
 
-        //Nhận tin nhắn
+        //mqtt here
+        #region MQTT
         private void client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
         {
             //Nhận
@@ -363,7 +439,7 @@ namespace HEV_Agent_V2
             Debug.WriteLine("Kết nối vừa bị đóng vì cái gì đó");
         }
 
-
+        #endregion end mqtt
 
         private async Task PersistConnectionAsync()
         {
@@ -553,6 +629,25 @@ namespace HEV_Agent_V2
 
         private void radPageView1_SelectedPageChanged(object sender, EventArgs e)
         {
+
+        }
+
+        private void fileSystemWatcher1_Changed(object sender, System.IO.FileSystemEventArgs e)
+        {
+            string systemp = string.Format("System_{0}_{1}_{2}.log", DateTime.Now.ToString("yy"), DateTime.Now.ToString("MM"), DateTime.Now.ToString("dd"));
+            Debug.WriteLine(e.Name);
+           // Debug.WriteLine("TEM NAME : "+sykostemp);
+            //Nếu là ERROR LOG
+            if (e.Name == "ErrorLog.log")
+                PhanTichErrorLog(e.FullPath, "ErrorLog.log");
+
+            //Nếu là system
+            if (e.Name.Contains(systemp)) {
+                
+                PhanTichOK(e.FullPath, systemp);
+            }
+
+
 
         }
     }

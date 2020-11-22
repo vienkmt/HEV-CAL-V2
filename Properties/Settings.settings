@@ -6,10 +6,10 @@
       <Value Profile="(Default)">127.0.0.1</Value>
     </Setting>
     <Setting Name="LogPath" Type="System.String" Scope="User">
-      <Value Profile="(Default)">C:\FA\LOG</Value>
+      <Value Profile="(Default)">C:\FA\RFCAL24\Log</Value>
     </Setting>
     <Setting Name="Note" Type="System.String" Scope="User">
-      <Value Profile="(Default)">OCTA Line xx</Value>
+      <Value Profile="(Default)">CAL Line xx</Value>
     </Setting>
   </Settings>
 </SettingsFile>

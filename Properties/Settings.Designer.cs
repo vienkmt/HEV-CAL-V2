@@ -37,7 +37,7 @@ namespace HEV_Agent_V2.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("C:\\FA\\LOG")]
+        [global::System.Configuration.DefaultSettingValueAttribute("C:\\FA\\RFCAL24\\Log")]
         public string LogPath {
             get {
                 return ((string)(this["LogPath"]));
@@ -49,7 +49,7 @@ namespace HEV_Agent_V2.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("OCTA Line xx")]
+        [global::System.Configuration.DefaultSettingValueAttribute("CAL Line xx")]
         public string Note {
             get {
                 return ((string)(this["Note"]));
